@@ -1,0 +1,50 @@
+x-restart-policy: &restart_policy
+  # our policy is always restart the container unless it is explicitly stopped
+  # or Docker daemon is restarted
+  restart: unless-stopped
+services:
+  database:
+    <<: *restart_policy
+    image: "postgres:15-alpine"
+    ports:
+      - "5432:5432"
+    volumes:
+      - "express-database:/var/lib/postgresql/data"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}'"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  redis:
+    <<: *restart_policy
+    image: "redis:7-alpine"
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  bull-board:
+    <<: *restart_policy
+    image: "venatum/bull-board:latest"
+    ports:
+      - "4000:3000"
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+    depends_on:
+     - redis
+volumes:
+  express-database:
+    external: true
